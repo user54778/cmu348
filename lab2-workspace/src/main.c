@@ -2,7 +2,6 @@
  * This corresponds to lab 2. The goal of this program is to compute a digest of
  * a string and put the value on an 8 bit array of LEDs.
  */
-#include "Legacy/stm32_hal_legacy.h"
 #include "stm32f070xb.h"
 #include "stm32f0xx_hal.h"
 #include "stm32f0xx_hal_gpio.h"
@@ -13,9 +12,10 @@
 void SystemClockConfig(void);
 void ErrorHandler(void);
 void Configure_74HC374(void);
+void writeValue(unsigned char value);
 
 // The string digest
-char test_string[] = "secx is cool";
+char test_string[] = "secx";
 
 extern volatile uint8_t button_pressed;
 
@@ -34,13 +34,6 @@ int main() {
   // init peripherals here
   Configure_74HC374();
 
-  // Setup NVIC for ISR on button
-  /*
-  NVIC->ISER[0] |= (1 << EXTI4_15_IRQn);
-  EXTI->IMR |= (1 << 13);
-  */
-
-  /*
   // Lab 2 setup
   unsigned char accum = 0; // accumulator for string hash
   int i = 0;
@@ -54,10 +47,20 @@ int main() {
   // conceptually, this is the "output" that gets sent to
   // the LS374 flip flop.
   // This is the output state.
-  GPIOA->ODR = (unsigned char)accum;
-  */
+  // writeValue(accum);
+  // GPIOA->ODR = (unsigned char)accum;
 
   while (1) {
+    // PC13 reads HIGH (1) when released (not clicked) and LOW (0) when pressed
+    if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_RESET) {
+      // button pressed
+      writeValue(accum);
+    } else {
+      // button not pressed
+      writeValue(0x00);
+    }
+
+    HAL_Delay(10);
     /*
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     HAL_Delay(500);
@@ -75,6 +78,7 @@ int main() {
     //  0 1 4 5 6 7 8 9
     // HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
     // update first led to flash and reset all others
+    /*
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOA,
                       GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_4 | GPIO_PIN_6 |
@@ -96,6 +100,7 @@ int main() {
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
     HAL_Delay(1000);
+    */
   }
 }
 
@@ -137,6 +142,7 @@ void Configure_74HC374() {
   // enable clock on ports a and b
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
@@ -155,11 +161,27 @@ void Configure_74HC374() {
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  //
+  // enable user button 13
+  GPIO_InitStruct.Pin = GPIO_PIN_13;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
   HAL_GPIO_WritePin(GPIOA,
                     GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_4 |
                         GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9,
                     GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+}
+
+// writeValue writes values to the display where a bit of 1
+// should be lit, and 0 unlit.
+void writeValue(unsigned char value) {
+  GPIOA->ODR = value;
+
+  // Send to CLK on 374
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, GPIO_PIN_RESET);
 }
 
@@ -171,3 +193,9 @@ void ErrorHandler(void) {
 }
 
 void SysTick_Handler(void) { HAL_IncTick(); }
+
+/*
+  // Setup NVIC for ISR on button
+  NVIC->ISER[0] |= (1 << EXTI4_15_IRQn);
+  EXTI->IMR |= (1 << 13);
+*/
