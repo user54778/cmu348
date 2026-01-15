@@ -1,0 +1,2 @@
+All D1-8 are connected to the GPIOA.
+A0-A2, D12, D11, D8, D8, D2 -> PA0, PA1, PA2, PA4, PA6, PA7, PA9, PA8 

@@ -1,0 +1,27 @@
+
+partb.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <msbSet-0xa>:
+   0:	4805      	ldr	r0, [pc, #20]	@ (18 <done>)
+   2:	6801      	ldr	r1, [r0, #0]
+   4:	2280      	movs	r2, #128	@ 0x80
+   6:	4211      	tst	r1, r2
+   8:	d003      	beq.n	12 <msbUnset>
+
+0000000a <msbSet>:
+   a:	4a04      	ldr	r2, [pc, #16]	@ (1c <done+0x4>)
+   c:	2301      	movs	r3, #1
+   e:	6013      	str	r3, [r2, #0]
+  10:	e002      	b.n	18 <done>
+
+00000012 <msbUnset>:
+  12:	4a02      	ldr	r2, [pc, #8]	@ (1c <done+0x4>)
+  14:	2300      	movs	r3, #0
+  16:	6013      	str	r3, [r2, #0]
+
+00000018 <done>:
+  18:	48000010 	.word	0x48000010
+  1c:	48000410 	.word	0x48000410

@@ -1,0 +1,48 @@
+.syntax unified
+.cpu cortex-m0
+.thumb
+
+; D <- 0x0001
+;LDD #1 (Load contents of mem M and M + 1 into double accum D)
+MOVS r0, #1
+
+;STD Value ; Store double accumulator D in memory location
+; Value is 16-bits here
+LDR r4, =Value
+STR r0, [r4]
+
+; LDAA #255 / LDAB #255 -> D = 0XFFFF
+; These CPU12 instructions combines the registers.
+MOVS r0, #0xFF
+LSLS r0, r0, #8    ; 0xff << 8 == 0xff00
+ORRS r0, r0, #0xff ; 0xFF00 | 0xFF == 0xFFFF
+; Now r0 should be 0xFFFF (255)
+
+; ADDD Value 
+LDRH r1, [r4]
+ADDS r0, r0, r1
+
+; BCC cFlagClear
+BCC cFlagClear
+
+cFlagSet:
+  ;CLRA
+  MOVS r0, #0
+cFlagClear:
+  BEQ zFlagSet
+zFlagClear:
+  ;CLRB
+  MOVS r1, #0
+zFlagSet:
+  ;LDAB #20
+  ;LDAA #10
+  MOVS r1, 
+  LSLS r1, r1, 
+  ORRS r1, r1, 
+  ;SBA
+  ;branch if plus
+  ;BPL nFlagClear
+nFlagSet:
+  LDD #0
+nFlagClear:
+  LDD #65535

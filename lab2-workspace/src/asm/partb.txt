@@ -1,0 +1,23 @@
+.syntax unified
+.cpu cortex-m0
+.thumb
+
+LDR r0, =0x48000010
+LDR r1, [r0]
+//TST r1, #0x80
+MOVS r2, #0x80
+TST r1, r2
+BEQ msbUnset
+
+msbSet:
+  LDR r2, =0x48000410
+  MOVS r3, #1
+  STR r3, [r2]
+  B done
+
+msbUnset:
+  LDR r2, =0x48000410
+  MOVS r3, #0
+  STR r3, [r2]
+
+done:
