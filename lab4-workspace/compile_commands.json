@@ -1,0 +1,31 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/arm-none-eabi-gcc",
+      "-g",
+      "-O0",
+      "-Wall",
+      "-Wextra",
+      "-Warray-bounds",
+      "-Wno-unused-parameter",
+      "-mcpu=cortex-m0",
+      "-mthumb",
+      "-mlittle-endian",
+      "-mfloat-abi=soft",
+      "-DSTM32F070xB",
+      "-DUSE_HAL_DRIVER",
+      "-Iinclude/",
+      "-Iinclude/hal/",
+      "-I./bsp/Drivers/CMSIS/Core/Include",
+      "-I./bsp/Drivers/CMSIS/Device/ST/STM32F0xx/Include",
+      "-I./bsp/Drivers/STM32F0xx_HAL_Driver/Inc",
+      "-c",
+      "-o",
+      "src/main.o",
+      "src/main.c"
+    ],
+    "directory": "/home/secx/code/cmu-348/lab4-workspace",
+    "file": "/home/secx/code/cmu-348/lab4-workspace/src/main.c",
+    "output": "/home/secx/code/cmu-348/lab4-workspace/src/main.o"
+  }
+]
