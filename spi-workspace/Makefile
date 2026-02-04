@@ -17,12 +17,14 @@ DB = $(TOOLCHAIN_ROOT)arm-none-eabi-gdb
 
 # Project sources
 SRC_FILES = $(wildcard $(SRC_DIR)*.c) $(wildcard $(SRC_DIR)*/*.c)
+SRC_FILES += $(wildcard $(INC_DIR)display/*.c)
 ASM_FILES = $(wildcard $(SRC_DIR)*.s) $(wildcard $(SRC_DIR)*/*.s)
 LD_SCRIPT = $(SRC_DIR)/STM32F070XX_FLASH.ld
 
 # Project includes
-INCLUDES   = -I$(INC_DIR)
+INCLUDES  = -I$(INC_DIR)
 INCLUDES += -I$(INC_DIR)hal/
+INCLUDES += -I$(INC_DIR)display/
 
 # Vendor sources: Note that files in "Templates" are normally copied into project for customization,
 # but that is not necessary for this simple project.
@@ -37,7 +39,8 @@ SRC_FILES += $(VENDOR_ROOT)Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_pwr.c
 SRC_FILES += $(VENDOR_ROOT)Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_pwr_ex.c
 SRC_FILES += $(VENDOR_ROOT)Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_rcc.c
 SRC_FILES += $(VENDOR_ROOT)Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_rcc_ex.c
-
+SRC_FILES += $(VENDOR_ROOT)Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_spi.c
+SRC_FILES += $(VENDOR_ROOT)Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_dma.c
 
 # Vendor includes
 INCLUDES += -I$(VENDOR_ROOT)Drivers/CMSIS/Core/Include
