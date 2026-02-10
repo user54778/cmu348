@@ -2,77 +2,83 @@
 #define BABYDRIVER_H
 
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #define BD_FB_WIDTH 128
 #define BD_FB_HEIGHT 64
 
 // framebuffer size
 // working with bits not bytes
+// NOTE: BD_FB_SIZE MUST BE NO LARGER THAN 1024 BYTES FOR SSD1309
 #define BD_FB_SIZE (BD_FB_WIDTH * BD_FB_HEIGHT) / 8
 
-// SSD1306 commands
-#define BD_SSD1306_SET_CONTRAST 0x81
-#define BD_SSD1306_DISPLAY_ALL_ON_RESUME 0xA4
-#define BD_SSD1306_DISPLAY_ALL_ON 0xA5
-#define BD_SSD1306_DISPLAY_NORMAL 0xA6
-#define BD_SSD1306_DISPLAY_INVERSE 0xA7
-#define BD_SSD1306_DISPLAY_OFF 0xAE
-#define BD_SSD1306_DISPLAY_ON 0xAF
+// NOTE: These are taken from this library written here:
+// https://libstock.mikroe.com/projects/view/1957/ssd1309-oled-library
 
-// NOTE: Rest of commands are AI-generated based on SSD1306 data sheet
+/** BEGIN SSD1309 COMMANDS **/
 
-// Scrolling Commands
-#define BD_SSD1306_RIGHT_HORIZONTAL_SCROLL 0x26
-#define BD_SSD1306_LEFT_HORIZONTAL_SCROLL 0x27
-#define BD_SSD1306_VERTICAL_AND_RIGHT_HORIZONTAL_SCROLL 0x29
-#define BD_SSD1306_VERTICAL_AND_LEFT_HORIZONTAL_SCROLL 0x2A
-#define BD_SSD1306_DEACTIVATE_SCROLL 0x2E
-#define BD_SSD1306_ACTIVATE_SCROLL 0x2F
-#define BD_SSD1306_SET_VERTICAL_SCROLL_AREA 0xA3
+#define Set_Lower_Column_Start_Address_CMD 0x00
+#define Set_Higher_Column_Start_Address_CMD 0x10
+#define Set_Memory_Addressing_Mode_CMD 0x20
+#define Set_Column_Address_CMD 0x21
+#define Set_Page_Address_CMD 0x22
+#define Set_Display_Start_Line_CMD 0x40
+#define Set_Contrast_Control_CMD 0x81
+#define Set_Charge_Pump_CMD 0x8D
+#define Set_Segment_Remap_CMD 0xA0
+#define Set_Entire_Display_ON_CMD 0xA4
+#define Set_Normal_or_Inverse_Display_CMD 0xA6
+#define Set_Multiplex_Ratio_CMD 0xA8
+#define Set_Display_ON_or_OFF_CMD 0xAE
+#define Set_Page_Start_Address_CMD 0xB0
+#define Set_COM_Output_Scan_Direction_CMD 0xC0
+#define Set_Display_Offset_CMD 0xD3
+#define Set_Display_Clock_CMD 0xD5
+#define Set_Pre_charge_Period_CMD 0xD9
+#define Set_Common_HW_Config_CMD 0xDA
+#define Set_VCOMH_Level_CMD 0xDB
+#define Set_NOP_CMD 0xE3
 
-// Addressing Setting Commands
-#define BD_SSD1306_SET_LOWER_COLUMN 0x00  // (0x00-0x0F)
-#define BD_SSD1306_SET_HIGHER_COLUMN 0x10 // (0x10-0x1F)
-#define BD_SSD1306_MEMORY_ADDR_MODE 0x20
-#define BD_SSD1306_SET_COLUMN_ADDR 0x21     // Triple byte command
-#define BD_SSD1306_SET_PAGE_ADDR 0x22       // Triple byte command
-#define BD_SSD1306_SET_PAGE_START_ADDR 0xB0 // (0xB0-0xB7)
+#define Horizontal_Addressing_Mode 0x00
+#define Vertical_Addressing_Mode 0x01
+#define Page_Addressing_Mode 0x02
 
-// Hardware Configuration Commands
-#define BD_SSD1306_SET_START_LINE 0x40 // (0x40-0x7F)
-#define BD_SSD1306_SET_SEGMENT_REMAP_0 0xA0
-#define BD_SSD1306_SET_SEGMENT_REMAP_127 0xA1
-#define BD_SSD1306_SET_MULTIPLEX_RATIO 0xA8 // Double byte command
-#define BD_SSD1306_COM_SCAN_DIR_NORMAL 0xC0
-#define BD_SSD1306_COM_SCAN_DIR_REMAP 0xC8
-#define BD_SSD1306_SET_DISPLAY_OFFSET 0xD3 // Double byte command
-#define BD_SSD1306_SET_COM_PINS 0xDA       // Double byte command
+#define Disable_Charge_Pump 0x00
+#define Enable_Charge_Pump 0x04
 
-// Timing & Driving Scheme Commands
-#define BD_SSD1306_SET_DISPLAY_CLOCK 0xD5    // Double byte command
-#define BD_SSD1306_SET_PRECHARGE_PERIOD 0xD9 // Double byte command
-#define BD_SSD1306_SET_VCOMH_DESELECT 0xDB   // Double byte command
-#define BD_SSD1306_NOP 0xE3
+#define Column_Address_0_Mapped_to_SEG0 0x00
+#define Column_Address_0_Mapped_to_SEG127 0x01
 
-// Charge Pump Commands
-#define BD_SSD1306_CHARGE_PUMP_SETTING 0x8D // Double byte command
-#define BD_SSD1306_CHARGE_PUMP_ENABLE 0x14
-#define BD_SSD1306_CHARGE_PUMP_DISABLE 0x10
+#define Normal_Display 0x00
+#define Entire_Display_ON 0x01
+/** ----------------------------------------- **/
+#define Non_Inverted_Display 0x00
+#define Inverted_Display 0x01
+/** ----------------------------------------- **/
+#define Display_OFF 0x00
+#define Display_ON 0x01
 
-// Memory Addressing Modes (for use with 0x20)
-#define BD_SSD1306_ADDR_MODE_HORIZONTAL 0x00
-#define BD_SSD1306_ADDR_MODE_VERTICAL 0x01
-#define BD_SSD1306_ADDR_MODE_PAGE 0x02
+#define Scan_from_COM0_to_63 0x00
+#define Scan_from_COM63_to_0 0x08
+
+#define x_size 128
+#define x_max x_size
+#define x_min 0
+#define y_size 64
+#define y_max 8
+#define y_min 0
 
 extern uint8_t BD_FRAMEBUFFER[BD_FB_SIZE];
 
 void bd_set_pixel(int x, int y, bool state);
 int bd_get_pixel(int x, int y);
 void bd_draw_bitmap(int x, int y, int width, int height, const uint8_t *bitmap);
+void bd_draw_text(int x, int y, int size, char *text);
+void bd_fill_framebuffer(bool colour);
+void bd_print_framebuffer();
 
-/* NOTE: BEGIN PHYSICAL COMS */
+/** NOTE: BEGIN PHYSICAL COMS **/
 
 // An abstraction that uses function pointers as a way for the user
 // to register their own HAL SPI send function.
@@ -83,8 +89,9 @@ void bd_set_spi_cs(void (*set_cs)(bool state));
 void bd_power_on(void);
 void bd_power_off(void);
 
-void bd_render_framebuffer(void);
+void bd_render_framebuffer();
 void bd_init(void);
-void bd_clear(void);
-void *oled_memset(void *ptr, int c, size_t len);
+void bd_clear_screen();
+void bd_clear_buffer();
+
 #endif
