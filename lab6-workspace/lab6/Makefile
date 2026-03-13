@@ -56,7 +56,8 @@ CFLAGS += -DSTM32F070xB -DUSE_HAL_DRIVER
 CFLAGS += $(INCLUDES)
 
 # Linker Flags
-LFLAGS = -Wl,--gc-sections -Wl,-T$(LD_SCRIPT) --specs=rdimon.specs
+# rdimon.specs for gdb 
+LFLAGS = -Wl,--gc-sections -Wl,-T$(LD_SCRIPT) --specs=nosys.specs
 
 ###############################################################################
 
