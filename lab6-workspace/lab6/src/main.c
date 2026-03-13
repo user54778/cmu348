@@ -10,15 +10,16 @@
 #include "system_stm32f0xx.h"
 
 #include "main.h"
+#include <stdint.h>
 #include <stdio.h>
 
 SPI_HandleTypeDef hspi1;
 
 UART_HandleTypeDef huart2;
 
-int __io_putchar(int ch) {
-  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-  return ch;
+int _write(int fd, char *ptr, size_t len) {
+  HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, HAL_MAX_DELAY);
+  return len;
 }
 
 // STM32 setup
@@ -27,14 +28,17 @@ static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
 
-extern volatile uint8_t switch_flag;
+// A bit field containing different flags for
+// EXTI lines, each of 1 width.
+// NOTE: Global
+extern volatile ExtiFlags extiFlags;
 
-// Specific lab function
+// Compute CRC of USART signal.
 unsigned char Crc(char *, unsigned char, unsigned char);
 
 // Specific lab globals
 char groupString[] = "F070";
-char msgBuf[17];
+char msgBuf[17]; // needed?
 
 /**
  * @brief  The application entry point.
@@ -54,43 +58,34 @@ int main(void) {
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_SPI1_Init();
+  // MX_SPI1_Init();
   MX_USART2_UART_Init();
 
-  // Configure EXTI interrupt for SPST switch
-  // enable peripheral clock of c (needed?)
-  RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
-  // reset syscfg as its by default mapped to pa0.
-  SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI0;
-  SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI0_PC;
-  // configure mask bit in IMR
-  EXTI->IMR |= (1 << 0);
-  // configure trigger selection on interrupt line on rising edge
-  // EXTI->RTSR = 0x0001;
-  // configure trigger select bit on interrupt line on falling edge
-  EXTI->FTSR |= (1 << 0);
-
-  // configure NVIC for external interrupt
-  NVIC_EnableIRQ(EXTI0_1_IRQn);
-  NVIC_SetPriority(EXTI0_1_IRQn, 0);
-
-  // Debug sequence -> Is HAL working?
   for (int i = 0; i < 3; i++) {
+
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
     HAL_Delay(100);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
     HAL_Delay(100);
   }
 
-  while (1) {
-    if (switch_flag) {
+  uint8_t msg[] = "F070RB\r\n";
+  HAL_UART_Transmit(&huart2, msg, sizeof(msg) - 1, HAL_MAX_DELAY);
 
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-      HAL_Delay(300);
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-      HAL_Delay(300);
-      switch_flag = 0;
-    }
+  // invert to active low
+  extiFlags.flags.pc0Flag = (GPIOC->IDR & (1 << 0)) ? 0 : 1;
+  extiFlags.flags.pc1Flag = (GPIOC->IDR & (1 << 1)) ? 0 : 1;
+  extiFlags.flags.pc2Flag = (GPIOC->IDR & (1 << 2)) ? 0 : 1;
+  extiFlags.flags.pc3Flag = (GPIOC->IDR & (1 << 3)) ? 0 : 1;
+  HAL_Delay(1000);
+
+  printf("%04X\r\n", (unsigned int)(GPIOC->IDR & 0xF));
+
+  while (1) {
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+    HAL_Delay(500);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    HAL_Delay(500);
   }
 }
 
@@ -178,7 +173,7 @@ static void MX_USART2_UART_Init(void) {
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 38400;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -224,9 +219,17 @@ static void MX_GPIO_Init(void) {
 
   /*Configure GPIO pins : SPST_0_Pin SPST_1_Pin SPST_2_Pin SPST_3_Pin */
   //| SPST_1_Pin | SPST_2_Pin | SPST_3_Pin;
-  GPIO_InitStruct.Pin = SPST_0_Pin;
+  /*
+  GPIO_InitStruct.Pin = SPST_0_Pin | SPST_1_Pin | SPST_2_Pin | SPST_3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  */
+
+  GPIO_InitStruct.Pin = SPST_0_Pin | SPST_1_Pin | SPST_2_Pin | SPST_3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  // GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
   /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -279,3 +282,64 @@ void assert_failed(uint8_t *file, uint32_t line) {
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+// Configure EXTI interrupt for SPST switch
+// enable peripheral clock of c (needed?)
+/*
+RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
+
+// reset syscfg as its by default mapped to pa0.
+SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI0;
+SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI0_PC;
+SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI1;
+SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI1_PC;
+SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI2;
+SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI2_PC;
+SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI3;
+SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI3_PC;
+
+// configure mask bit in IMR
+EXTI->IMR |= (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);
+// configure trigger selection on interrupt line on rising edge
+// EXTI->RTSR = 0x0001;
+// configure trigger select bit on interrupt line on falling edge
+EXTI->FTSR |= (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);
+
+// clear any pr's
+EXTI->PR |= (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);
+// configure NVIC for external interrupt
+NVIC_EnableIRQ(EXTI0_1_IRQn);
+NVIC_EnableIRQ(EXTI2_3_IRQn);
+NVIC_SetPriority(EXTI0_1_IRQn, 0);
+NVIC_SetPriority(EXTI2_3_IRQn, 0);
+
+extiFlags.allFlags = 0;
+*/
+
+/*
+if (extiFlags.flags.pc0Flag) {
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_Delay(500);
+  extiFlags.flags.pc0Flag = 0;
+} else if (extiFlags.flags.pc1Flag) {
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+  HAL_Delay(100);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_Delay(100);
+  extiFlags.flags.pc1Flag = 0;
+} else if (extiFlags.flags.pc2Flag) {
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+  HAL_Delay(1000);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_Delay(1000);
+  extiFlags.flags.pc2Flag = 0;
+} else if (extiFlags.flags.pc3Flag) {
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+  HAL_Delay(2000);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_Delay(2000);
+  extiFlags.flags.pc3Flag = 0;
+}
+*/

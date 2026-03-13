@@ -57,7 +57,7 @@
 /* External variables --------------------------------------------------------*/
 
 /* USER CODE BEGIN EV */
-volatile uint8_t switch_flag = 0;
+volatile ExtiFlags extiFlags;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -135,11 +135,28 @@ void SysTick_Handler(void) {
 
 /* USER CODE BEGIN 1 */
 
-//
 void EXTI0_1_IRQHandler(void) {
-  EXTI->PR |= (1 << 0);
+  // NOTE: Pending Register tracks which EXTI lines have a triggered
+  // but not yet handled interrupt, with each bit corresponding to an
+  // EXTI line.
+  if (EXTI->PR & (1 << 0)) {
+    extiFlags.flags.pc0Flag = 1;
+  }
 
-  switch_flag = 1;
+  // To set the 2nd bit, we need to shift a 1 down 1 spot (into 2)
+  if (EXTI->PR & (1 << 1)) {
+    extiFlags.flags.pc1Flag = 1;
+  }
+}
+
+void EXTI2_3_IRQHandler(void) {
+  if (EXTI->PR & (1 << 2)) {
+    extiFlags.flags.pc2Flag = 1;
+  }
+
+  if (EXTI->PR & (1 << 3)) {
+    extiFlags.flags.pc3Flag = 1;
+  }
 }
 
 /* USER CODE END 1 */

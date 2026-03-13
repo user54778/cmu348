@@ -54,6 +54,16 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+typedef union {
+  struct {
+    // 1 bit of width for this field
+    volatile uint8_t pc0Flag : 1;
+    volatile uint8_t pc1Flag : 1;
+    volatile uint8_t pc2Flag : 1;
+    volatile uint8_t pc3Flag : 1;
+  } flags;
+  uint8_t allFlags;
+} ExtiFlags;
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
