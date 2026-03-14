@@ -13,8 +13,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
-SPI_HandleTypeDef hspi1;
+#define POLY 0xEA
+#define QUERY_MAX_LEN 16
+#define RESPONSE_MAX_LEN 16
 
+SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart2;
 
 int _write(int fd, char *ptr, size_t len) {
@@ -31,14 +34,14 @@ static void MX_USART2_UART_Init(void);
 // A bit field containing different flags for
 // EXTI lines, each of 1 width.
 // NOTE: Global
-extern volatile ExtiFlags extiFlags;
+// extern volatile ExtiFlags extiFlags;
 
 // Compute CRC of USART signal.
 unsigned char Crc(char *, unsigned char, unsigned char);
+void doUsartComm(void);
 
 // Specific lab globals
 char groupString[] = "F070";
-char msgBuf[17]; // needed?
 
 /**
  * @brief  The application entry point.
@@ -61,31 +64,15 @@ int main(void) {
   // MX_SPI1_Init();
   MX_USART2_UART_Init();
 
-  for (int i = 0; i < 3; i++) {
+  // uint8_t msg[] = "F070RB\r\n";
+  // HAL_UART_Transmit(&huart2, msg, sizeof(msg) - 1, HAL_MAX_DELAY);
 
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-    HAL_Delay(100);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-    HAL_Delay(100);
-  }
+  // printf("%04X\r\n", (unsigned int)(GPIOC->IDR & 0xF));
+  // compute CRC of groupString
 
-  uint8_t msg[] = "F070RB\r\n";
-  HAL_UART_Transmit(&huart2, msg, sizeof(msg) - 1, HAL_MAX_DELAY);
-
-  // invert to active low
-  extiFlags.flags.pc0Flag = (GPIOC->IDR & (1 << 0)) ? 0 : 1;
-  extiFlags.flags.pc1Flag = (GPIOC->IDR & (1 << 1)) ? 0 : 1;
-  extiFlags.flags.pc2Flag = (GPIOC->IDR & (1 << 2)) ? 0 : 1;
-  extiFlags.flags.pc3Flag = (GPIOC->IDR & (1 << 3)) ? 0 : 1;
-  HAL_Delay(1000);
-
-  printf("%04X\r\n", (unsigned int)(GPIOC->IDR & 0xF));
+  doUsartComm();
 
   while (1) {
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-    HAL_Delay(500);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-    HAL_Delay(500);
   }
 }
 
@@ -217,22 +204,10 @@ static void MX_GPIO_Init(void) {
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SPST_0_Pin SPST_1_Pin SPST_2_Pin SPST_3_Pin */
-  //| SPST_1_Pin | SPST_2_Pin | SPST_3_Pin;
-  /*
-  GPIO_InitStruct.Pin = SPST_0_Pin | SPST_1_Pin | SPST_2_Pin | SPST_3_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-  */
-
-  GPIO_InitStruct.Pin = SPST_0_Pin | SPST_1_Pin | SPST_2_Pin | SPST_3_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  // GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
   /* USER CODE END MX_GPIO_Init_2 */
 }
+
+// --------------- USER CODE ----------------- //
 
 unsigned char Crc(char *string, unsigned char length,
                   unsigned char polynomial) {
@@ -252,7 +227,89 @@ unsigned char Crc(char *string, unsigned char length,
   }
   return crc;
 }
-/* USER CODE END 4 */
+
+// Send USART communication to a PuTTTY instance and receive a response back.
+void doUsartComm() {
+  char query[QUERY_MAX_LEN + 1];       // string to hold query value;
+  char response[RESPONSE_MAX_LEN + 1]; // string to hold response value
+  char i;                              // counter
+  char crcRx;                          // received CRC value
+  unsigned char crcComp;               // computed CRC value
+  int errFlag;                         // to hold return values
+
+  /***********TRANSMISSION PREP PORTION**************/
+
+  // compute CRC of groupString
+  crcComp = Crc(groupString, 2, POLY);
+
+  // display group string, the CRC, and the current baud rate on the LCD:
+  // hint, use sprintf with "%s 0x%02X BR=%d" as your control string
+
+  // uint8_t msg[] = "F070RB\r\n";
+  // printf("%s 0x%02X BR=%lu\r\n", groupString, (unsigned int)crcComp,
+  //       huart2.Init.BaudRate);
+  // wait for button press
+  // TODO: wait for the user to press PB1 to initiate transmission
+  //
+  // Problem: We cant use any while/do while loop since itll block.
+  // How can we do a non-blocking approach to let the system blink while waiting
+  // for a button click?
+  uint32_t timestamp = HAL_GetTick();
+  volatile uint32_t blinkTime = 500;
+  while (1) {
+    if (!(GPIOC->IDR & (1 << 13))) {
+      printf("%s 0x%02X BR=%lu\r\n", groupString, (unsigned int)crcComp,
+             huart2.Init.BaudRate);
+      break;
+    } else {
+      if (HAL_GetTick() - timestamp >= blinkTime) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+        timestamp = HAL_GetTick();
+      }
+    }
+  }
+  /*
+  while (!(GPIOC->IDR & (1 << 13))) {
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+    HAL_Delay(500);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    HAL_Delay(500);
+  }
+  printf("%s 0x%02X BR=%lu\r\n", groupString, (unsigned int)crcComp,
+         huart2.Init.BaudRate);
+  HAL_Delay(1000);
+  */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+  HAL_Delay(100);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_Delay(100);
+
+  /****************TRANSMISSION PORTION *************/
+  // TODO:  Construct the query by concatentating groupString:crcComp:NULL
+  //   Note:  NULL denoted a null byte, not the string "NULL"
+
+  // TODO:  Transmit each byte of the query, including the NULL terminator
+  //        hint:  After sending each byte, you should monitor the status
+  //               register to see when the transmitter is ready for the next
+  //               value.
+
+  /*************RECEPTION PORTION*****************/
+
+  // TODO:  Receive bytes and copy them into 'response' string until
+  //        the null character is received or the RESPONSE_MAX_LEN
+  //        is reached.
+  // Hint:  You must monitor the status register to see when a value
+  //        has been received into the data register.
+
+  // TODO:  CRC check
+  //        Extract the CRC from the received data and replace the CRC with a
+  //        NULL byte. Compute the CRC of the received message. Compare the
+  //        received and computed CRC values and display an error if they
+  //        don't match
+
+  // TODO Format the response and the crc and display the values on the LCD
+  // Hint:  Use sprintf with the control string "%s 0x%x".
+}
 
 /**
  * @brief  This function is executed in case of error occurrence.
@@ -260,7 +317,8 @@ unsigned char Crc(char *string, unsigned char length,
  */
 void Error_Handler(void) {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+  /* User can add his own implementation to report the HAL error return state
+   */
   __disable_irq();
   while (1) {
   }
@@ -277,8 +335,8 @@ void Error_Handler(void) {
 void assert_failed(uint8_t *file, uint32_t line) {
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line
-     number, ex: printf("Wrong parameters value: file %s on line %d\r\n", file,
-     line) */
+     number, ex: printf("Wrong parameters value: file %s on line %d\r\n",
+     file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
@@ -342,4 +400,11 @@ if (extiFlags.flags.pc0Flag) {
   HAL_Delay(2000);
   extiFlags.flags.pc3Flag = 0;
 }
+*/
+// invert to active low
+/*
+extiFlags.flags.pc0Flag = (GPIOC->IDR & (1 << 0)) ? 0 : 1;
+extiFlags.flags.pc1Flag = (GPIOC->IDR & (1 << 1)) ? 0 : 1;
+extiFlags.flags.pc2Flag = (GPIOC->IDR & (1 << 2)) ? 0 : 1;
+extiFlags.flags.pc3Flag = (GPIOC->IDR & (1 << 3)) ? 0 : 1;
 */
