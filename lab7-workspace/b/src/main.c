@@ -27,8 +27,8 @@ int _write(int fd, char *ptr, size_t len) {
 }
 
 void SystemClock_Config(void);
-static void MX_USART2_UART_Init(void);
 static void MX_GPIO_Init(void);
+static void MX_USART2_UART_Init(void);
 
 // A global selection and result variable
 volatile uint8_t selection = 0;
@@ -56,18 +56,38 @@ int main() {
     HAL_Delay(100);
   }
 
+  printf("hello, world!\r\n");
+
   // The purpose of this is to act as a "breakpoint" in a sense.
   // We hit UDF, and the handler based on the selection value
   // will determine what to do about the given register values.
-  selection = 0x01;
   result = 0x0;
 
-  __asm volatile("MOV R0, #0x11");
+  /*
+  __asm volatile("MOV R0, #0x11"); // register a
+  __asm volatile("MOV R1, #0x22"); // register b
+  __asm volatile("MOV R2, #0x33"); // register x
+  __asm volatile("MOV R3, #0x44"); // register y
   __asm volatile("UDF #0");
+  */
+  //::: "memory");
+  // 0x01, 0x02, 0x04, 0x08
+  uint8_t cases[] = {0x01, 0x02, 0x04, 0x08, 0x40, 0x80};
+  uint8_t size = 6;
 
-  // result should load 0x11 here.
+  for (int i = 0; i < size; i++) {
+    selection = cases[i];
+    __asm volatile("MOV R0, #0x11\n"
+                   "MOV R1, #0x22\n"
+                   "MOV R2, #0x33\n"
+                   "MOV R3, #0x44\n"
+                   "UDF #0\n" ::
+                       : "r0", "r1", "r2", "r3");
+    printf("result: %04x\r\n", result);
+  }
+  // "::: Clobber" list states r0-r3 will contain new values after this block
+  // Compiler, pls dont assume they still hold w/e was held before
 
-  // printf("result: %04x\n", result);
   //
   while (1) {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);

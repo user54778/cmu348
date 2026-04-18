@@ -24,7 +24,6 @@ LD_SCRIPT = $(SRC_DIR)/STM32F070XX_FLASH.ld
 # Project includes
 INCLUDES  = -I$(INC_DIR)
 INCLUDES += -I$(INC_DIR)hal/
-INCLUDES += -I$(INC_DIR)display/
 
 # Vendor sources: Note that files in "Templates" are normally copied into project for customization,
 # but that is not necessary for this simple project.
