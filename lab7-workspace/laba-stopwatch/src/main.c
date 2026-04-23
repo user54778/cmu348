@@ -19,18 +19,21 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 
+// An enumeration of the states our timer detection rollover can be in.
+typedef enum {
+  INIT = 0,
+  HIGH_BIT_SET = 1,
+  HIGH_BIT_CLEAR = 2,
+  ROLLOVER = 3,
+} TimerState;
+
 int main() {
   HAL_Init();
   SystemClock_Config();
   MX_GPIO_Init();
   MX_USART2_UART_Init();
 
-  GPIOA->ODR &= ~(1 << 5);
-
-  // simple timer exercise - upon one button press start a timer. on an
-  // *additional* press, end the timer and print out the elapsed time.
-  volatile uint32_t startTim = 0;
-  volatile uint32_t endTim = 0;
+  // flag to mark if button has been pressed
   volatile uint8_t timFlag = 0;
 
   // Track the exact moment the button changes from one state to another (i.e.,
@@ -38,25 +41,87 @@ int main() {
   uint8_t btnNow = 0;
   uint8_t btnPrev = 1;
 
+  // The main goal of this portion is to implement a *free-running* timer, where
+  // upon button press once, then again will compute a time slice of that time
+  // period.
+  // Implement a state machine that monitors the MSB of TIM3->CNT that
+  // does the following: 1) Upon initializing the timer, check the MSB
+  // immediately
+  //    if MSB = 1 -> GOTO HIGH BIT SET
+  //    if MSB = 0 -> GOTO HIGH BIT CLEAR
+  // 2) HIGH BIT SET - MSB is 1, counter upper half of its range
+  //    if MSB = 0 -> GOTO ROLLOVER
+  //    if MSB = 1 -> STAY IN HIGH BIT SET
+  // 3) ROLLOVER - (MSB transitioned from 1 -> 0)
+  //    GOTO HIGH BIT CLEAR
+  // 4) HIGH BIT CLEAR - MSB is 0, counter in lower half range
+  //    if MSB = 1 -> GOTO HIGH BIT SET
+  //    if MSB = 0 -> stay in HIGH BIT CLEAR
+
+  // Setup TIM3 timer to be a free-running upcounter
+  // enable peripheral clock of timer
+  // set prescaler to 0.5 MHz
+  RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+  TIM3->PSC = 0x0F;         // prescaler = 0.5MHz
+  TIM3->ARR = 0xFFFF;       // arr to max
+  TIM3->CR1 |= TIM_CR1_CEN; // start timer
+
+  TimerState state = INIT;
+  int32_t timeAccumulator = 0;
+
   while (1) {
+    uint16_t cnt = TIM3->CNT;      // grab the counter value
+    uint8_t msb = (cnt >> 15) & 1; // grab its MSB
+    // state machine that monitors MSB of CNT value
+    switch (state) {
+    case INIT:
+      if (msb) {
+        state = HIGH_BIT_SET;
+      } else {
+        state = HIGH_BIT_CLEAR;
+      }
+      break;
+    case HIGH_BIT_SET:
+      if (!msb) {
+        state = ROLLOVER;
+      }
+      break;
+    case HIGH_BIT_CLEAR:
+      if (msb) {
+        state = HIGH_BIT_SET;
+      }
+      break;
+    case ROLLOVER:
+      // Rollover = 65536 ticks * 2 microseconds = 131.072 ms.
+      // In fixed point => 131.072e-3 * 65536 = 8590 = 0x218E
+      timeAccumulator += 0x218E;
+      state = HIGH_BIT_CLEAR;
+      break;
+    default:
+      Error_Handler(); // should never happen
+    }
+    // HAL version of stopwatch
     btnNow =
         (GPIOC->IDR & (1 << 13)) ? 1 : 0; // 1 = button released, 0 = pressed
 
     // Act only on when the button got pressed once.
     if (btnPrev == 1 && btnNow == 0) {
       if (!timFlag) {
-        startTim = HAL_GetTick();
+        timeAccumulator = 0;
         timFlag = 1;
       } else {
-        endTim = HAL_GetTick() - startTim;
         timFlag = 0;
-        printf("Elapsed time: %ld ms\r\n", endTim);
+        uint32_t timeAccumulated = timeAccumulator >> 16;
+        uint16_t min = timeAccumulated / 60;
+        uint16_t sec = timeAccumulated % 60;
+        printf("%d:%d\r\n", min, sec);
       }
     }
 
     btnPrev = btnNow; // lock out re-entry until state changes again (kind of
                       // like a semaphore!)
-    HAL_Delay(50);    // debounce button
+    // HAL_Delay(50);    // debounce button (remove for real implementation
+    // since could cause miss CNT sample)
   }
 }
 /**
